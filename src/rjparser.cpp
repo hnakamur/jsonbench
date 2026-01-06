@@ -27,7 +27,9 @@ class RJSAXHandler {
     m_arg_num_limit(0),
     m_arg_num_limit_exceeded(false),
     m_silence(false)
-    {};
+    {
+        m_result_buffer.reserve(4096);  // Start with 4KB capacity
+    };
     ~RJSAXHandler() {};
 
     static bool init() {
@@ -70,7 +72,13 @@ class RJSAXHandler {
         }
         argval.replace(0, value.size(), value);
         argval.resize(value.size());
-        std::cout << argname << ": " << argval << std::endl;
+
+        /* Append to result buffer instead of printing to stdout */
+        m_result_buffer += argname;
+        m_result_buffer += ": ";
+        m_result_buffer += argval;
+        m_result_buffer += "\n";
+
         m_arg_num_counter++;
         if (m_arg_num_limit > 0 &&
             m_arg_num_counter > m_arg_num_limit) {
@@ -251,6 +259,10 @@ class RJSAXHandler {
         }
     }
 
+    std::string getResultBuffer() const {
+        return m_result_buffer;
+    }
+
     private:
     double         m_max_depth;
     int64_t        m_current_depth;
@@ -263,6 +275,7 @@ class RJSAXHandler {
     long int       m_arg_num_limit;
     bool           m_arg_num_limit_exceeded;
     bool           m_silence;
+    std::string    m_result_buffer;
 
 };
 
@@ -333,6 +346,16 @@ extern "C" int rj_set_silence(rj_parser *parser, int silence) {
 extern "C" int rj_parser_cleanup(rj_parser *parser) {
     parser->impl.~RJSAXHandler();
     return 0;
+}
+
+extern "C" const char* rj_get_result_buffer(rj_parser *parser) {
+    if (!parser) return nullptr;
+    return parser->impl.getResultBuffer().c_str();
+}
+
+extern "C" size_t rj_get_result_buffer_size(rj_parser *parser) {
+    if (!parser) return 0;
+    return parser->impl.getResultBuffer().size();
 }
 
 #endif
