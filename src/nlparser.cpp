@@ -252,7 +252,7 @@ class NLSAXHandler : public nlohmann::json_sax<nlohmann::json>{
         }
     }
 
-    std::string getResultBuffer() const {
+    const std::string& getResultBuffer() const {
         return m_result_buffer;
     }
 

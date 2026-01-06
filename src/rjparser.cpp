@@ -259,7 +259,7 @@ class RJSAXHandler {
         }
     }
 
-    std::string getResultBuffer() const {
+    const std::string& getResultBuffer() const {
         return m_result_buffer;
     }
 
