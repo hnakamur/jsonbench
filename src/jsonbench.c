@@ -9,6 +9,13 @@
 #include <getopt.h>
 #include <limits.h>
 #include <time.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <errno.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 #ifndef FILE_BUFFER_SIZE
 #define FILE_BUFFER_SIZE 524288
@@ -83,6 +90,187 @@ static int read_file(const char *filename, char *buffer) {
     return length;
 }
 
+static int is_directory(const char *path) {
+    struct stat statbuf;
+    if (stat(path, &statbuf) != 0) {
+        return 0;
+    }
+    return S_ISDIR(statbuf.st_mode);
+}
+
+static int process_file(const char *jsonfile, const char *jsonengine,
+                       unsigned int depth_limit, unsigned int arg_limit, int silence) {
+    char *error_msg;
+    unsigned int length = 0;
+    char data[FILE_BUFFER_SIZE];
+    struct timespec ts_before, ts_after, ts_diff;
+    int rc;
+
+    printf("Processing file: %s\n", jsonfile);
+
+    rc = read_file(jsonfile, data);
+    if (rc == 0) {
+        printf("Zero character read from file\n");
+        return EXIT_FAILURE;
+    }
+    else if (rc < 0) {
+        printf("Error reading file\n");
+        return EXIT_FAILURE;
+    }
+    else {
+        length = rc;
+    }
+
+#if HAVE_YAJL
+    if (strcmp(jsonengine, "YAJL") == 0) {
+        yajl_json_data *json = NULL;
+        yajl_json_init(&json, &error_msg);
+
+        if (json != NULL) {
+
+            json->depth_limit   = depth_limit;
+            json->arg_num_limit = arg_limit;
+            json->silence       = silence;
+
+            clock_gettime(CLOCK_REALTIME, &ts_before);
+            if (yajl_json_process_chunk(json, data, length, &error_msg) < 0) {
+                printf("Error: %s\n", error_msg);
+                free(error_msg);
+            }
+            clock_gettime(CLOCK_REALTIME, &ts_after);
+            ts_diff.tv_sec  = 0;
+            ts_diff.tv_nsec = 0;
+            timespec_diff(&ts_after, &ts_before, &ts_diff);
+
+            /* Output result buffer if not in silence mode */
+            if (!json->silence && json->result_buffer != NULL && json->result_buffer_size > 0) {
+                printf("%s", json->result_buffer);
+            }
+
+            yajl_json_cleanup(json);
+            printf("\nTime: %ld.%09ld usec\n\n", (long)ts_diff.tv_sec, ts_diff.tv_nsec);
+        }
+    }
+#endif
+#if HAVE_RAPIDJSON
+    if (strcmp(jsonengine, "RAPIDJSON") == 0) {
+
+        rj_parser *json = NULL;
+        rj_json_init(&json, &error_msg);
+        if (json == NULL) {
+            fprintf(stderr, "Failed to initialize JSON parser\n");
+            return 2;
+        }
+
+        rj_set_max_depth(json, depth_limit);
+        rj_set_max_arg_num(json, arg_limit);
+        rj_set_silence(json, silence);
+
+        clock_gettime(CLOCK_REALTIME, &ts_before);
+        rc = rj_parse_buffer(json, data, length, &error_msg);
+        if (rc != 0) {
+            fprintf(stderr, "Parse failed with code %d\n", rc);
+            fprintf(stderr, "Error: %s\n", error_msg);
+            free(error_msg);
+            return 3;
+        }
+        else {
+            clock_gettime(CLOCK_REALTIME, &ts_after);
+            ts_diff.tv_sec  = 0;
+            ts_diff.tv_nsec = 0;
+            timespec_diff(&ts_after, &ts_before, &ts_diff);
+
+            /* Output result buffer if not in silence mode */
+            if (!silence) {
+                const char* result_buffer = rj_get_result_buffer(json);
+                size_t result_size = rj_get_result_buffer_size(json);
+                if (result_buffer != NULL && result_size > 0) {
+                    printf("%s", result_buffer);
+                }
+            }
+
+            rj_json_cleanup(json);
+            printf("\nTime: %ld.%09ld usec\n\n", (long)ts_diff.tv_sec, ts_diff.tv_nsec);
+        }
+
+    }
+#endif
+#if HAVE_NLOHMANNJSON
+    if (strcmp(jsonengine, "NLOHMANNJSON") == 0) {
+
+        nl_parser *json = NULL;
+        nl_json_init(&json, &error_msg);
+        if (json == NULL) {
+            fprintf(stderr, "Failed to initialize JSON parser\n");
+            return 2;
+        }
+
+        nl_set_max_depth(json, depth_limit);
+        nl_set_max_arg_num(json, arg_limit);
+        nl_set_silence(json, silence);
+
+        clock_gettime(CLOCK_REALTIME, &ts_before);
+        rc = nl_parse_buffer(json, data, length, &error_msg);
+        if (rc != 0) {
+            fprintf(stderr, "Parse failed with code %d\n", rc);
+            fprintf(stderr, "Error: %s\n", error_msg);
+            free(error_msg);
+            return 3;
+        }
+        else {
+            clock_gettime(CLOCK_REALTIME, &ts_after);
+            ts_diff.tv_sec  = 0;
+            ts_diff.tv_nsec = 0;
+            timespec_diff(&ts_after, &ts_before, &ts_diff);
+
+            /* Output result buffer if not in silence mode */
+            if (!silence) {
+                const char* result_buffer = nl_get_result_buffer(json);
+                size_t result_size = nl_get_result_buffer_size(json);
+                if (result_buffer != NULL && result_size > 0) {
+                    printf("%s", result_buffer);
+                }
+            }
+
+            nl_json_cleanup(json);
+            printf("\nTime: %ld.%09ld usec\n\n", (long)ts_diff.tv_sec, ts_diff.tv_nsec);
+        }
+
+    }
+#endif
+    return 0;
+}
+
+static int process_directory(const char *dirname, const char *jsonengine,
+                            unsigned int depth_limit, unsigned int arg_limit, int silence) {
+    DIR *dir;
+    struct dirent *entry;
+    char filepath[PATH_MAX];
+
+    dir = opendir(dirname);
+    if (dir == NULL) {
+        fprintf(stderr, "Error: Unable to open directory %s: %s\n", dirname, strerror(errno));
+        return EXIT_FAILURE;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        snprintf(filepath, sizeof(filepath), "%s/%s", dirname, entry->d_name);
+
+        if (is_directory(filepath)) {
+            process_directory(filepath, jsonengine, depth_limit, arg_limit, silence);
+        } else {
+            process_file(filepath, jsonengine, depth_limit, arg_limit, silence);
+        }
+    }
+
+    closedir(dir);
+    return 0;
+}
+
 int main(int argc, char ** argv) {
     char           c;
     char          *jsonengine = NULL;
@@ -90,14 +278,10 @@ int main(int argc, char ** argv) {
     extern char   *optarg;
     extern int     optind, opterr, optopt;
 
-    char          *error_msg;
-    unsigned int   length = 0;
-    char           data[FILE_BUFFER_SIZE];  // 100M fixed length
     const char    *jsonfile = NULL;
     unsigned int   depth_limit = LIMIT_DEPTH;
     unsigned int   arg_limit   = LIMIT_ARG_NUM;
     int            silence = 0;
-    struct timespec ts_before, ts_after, ts_diff;
 
 #ifdef HAVE_YAJL
 strcpy(available_engines[engine_count++], "YAJL");
@@ -166,139 +350,16 @@ strcpy(available_engines[engine_count++], "NLOHMANNJSON");
         }
 
         if (jsonfile == NULL) {
-            printf("No JSON file was given!\n");
+            printf("No JSON file or directory was given!\n");
             return EXIT_FAILURE;
         }
 
-        int rc = read_file(jsonfile, data);
-        if (rc == 0) {
-            printf("Zero character read from file\n");
-            return EXIT_FAILURE;
+        if (is_directory(jsonfile)) {
+            process_directory(jsonfile, jsonengine, depth_limit, arg_limit, silence);
+        } else {
+            process_file(jsonfile, jsonengine, depth_limit, arg_limit, silence);
         }
-        else if (rc < 0) {
-            printf("Error reading file\n");
-            return EXIT_FAILURE;
-        }
-        else {
-            length = rc;
-        }
-#if HAVE_YAJL
-        if (strcmp(jsonengine, "YAJL") == 0) {
-            yajl_json_data *json = NULL;
-            yajl_json_init(&json, &error_msg);
 
-            if (json != NULL) {
-
-                json->depth_limit   = depth_limit;
-                json->arg_num_limit = arg_limit;
-                json->silence       = silence;
-
-                clock_gettime(CLOCK_REALTIME, &ts_before);
-                if (yajl_json_process_chunk(json, data, length, &error_msg) < 0) {
-                    printf("Error: %s\n", error_msg);
-                    free(error_msg);
-                }
-                clock_gettime(CLOCK_REALTIME, &ts_after);
-                ts_diff.tv_sec  = 0;
-                ts_diff.tv_nsec = 0;
-                timespec_diff(&ts_after, &ts_before, &ts_diff);
-
-                /* Output result buffer if not in silence mode */
-                if (!json->silence && json->result_buffer != NULL && json->result_buffer_size > 0) {
-                    printf("%s", json->result_buffer);
-                }
-
-                yajl_json_cleanup(json);
-                printf("\nTime: %ld.%09ld usec\n\n", (long)ts_diff.tv_sec, ts_diff.tv_nsec);
-            }
-        }
-#endif
-#if HAVE_RAPIDJSON
-        if (strcmp(jsonengine, "RAPIDJSON") == 0) {
-
-            rj_parser *json = NULL;
-            rj_json_init(&json, &error_msg);
-            if (json == NULL) {
-                fprintf(stderr, "Failed to initialize JSON parser\n");
-                return 2;
-            }
-
-            rj_set_max_depth(json, depth_limit);
-            rj_set_max_arg_num(json, arg_limit);
-            rj_set_silence(json, silence);
-
-            clock_gettime(CLOCK_REALTIME, &ts_before);
-            rc = rj_parse_buffer(json, data, length, &error_msg);
-            if (rc != 0) {
-                fprintf(stderr, "Parse failed with code %d\n", rc);
-                fprintf(stderr, "Error: %s\n", error_msg);
-                free(error_msg);
-                return 3;
-            }
-            else {
-                clock_gettime(CLOCK_REALTIME, &ts_after);
-                ts_diff.tv_sec  = 0;
-                ts_diff.tv_nsec = 0;
-                timespec_diff(&ts_after, &ts_before, &ts_diff);
-
-                /* Output result buffer if not in silence mode */
-                if (!silence) {
-                    const char* result_buffer = rj_get_result_buffer(json);
-                    size_t result_size = rj_get_result_buffer_size(json);
-                    if (result_buffer != NULL && result_size > 0) {
-                        printf("%s", result_buffer);
-                    }
-                }
-
-                rj_json_cleanup(json);
-                printf("\nTime: %ld.%09ld usec\n\n", (long)ts_diff.tv_sec, ts_diff.tv_nsec);
-            }
-
-        }
-#endif
-#if HAVE_NLOHMANNJSON
-        if (strcmp(jsonengine, "NLOHMANNJSON") == 0) {
-
-            nl_parser *json = NULL;
-            nl_json_init(&json, &error_msg);
-            if (json == NULL) {
-                fprintf(stderr, "Failed to initialize JSON parser\n");
-                return 2;
-            }
-
-            nl_set_max_depth(json, depth_limit);
-            nl_set_max_arg_num(json, arg_limit);
-            nl_set_silence(json, silence);
-
-            clock_gettime(CLOCK_REALTIME, &ts_before);
-            rc = nl_parse_buffer(json, data, length, &error_msg);
-            if (rc != 0) {
-                fprintf(stderr, "Parse failed with code %d\n", rc);
-                fprintf(stderr, "Error: %s\n", error_msg);
-                free(error_msg);
-                return 3;
-            }
-            else {
-                clock_gettime(CLOCK_REALTIME, &ts_after);
-                ts_diff.tv_sec  = 0;
-                ts_diff.tv_nsec = 0;
-                timespec_diff(&ts_after, &ts_before, &ts_diff);
-
-                /* Output result buffer if not in silence mode */
-                if (!silence) {
-                    const char* result_buffer = nl_get_result_buffer(json);
-                    size_t result_size = nl_get_result_buffer_size(json);
-                    if (result_buffer != NULL && result_size > 0) {
-                        printf("%s", result_buffer);
-                    }
-                }
-
-                nl_json_cleanup(json);
-                printf("\nTime: %ld.%09ld usec\n\n", (long)ts_diff.tv_sec, ts_diff.tv_nsec);
-            }
-
-        }
-#endif
         free(jsonengine);
     }
     else {
