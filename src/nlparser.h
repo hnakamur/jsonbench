@@ -2,6 +2,7 @@
 #define NL_PARSER_H
 
 #include "../config.h"
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,6 +16,8 @@ int nl_set_max_depth(nl_parser *parser, double max_depth);
 int nl_set_max_arg_num(nl_parser *parser, double max_arg_num);
 int nl_set_silence(nl_parser *parser, int silence);
 int nl_json_cleanup(nl_parser *parser);
+const char* nl_get_result_buffer(nl_parser *parser);
+size_t nl_get_result_buffer_size(nl_parser *parser);
 
 #ifdef __cplusplus
 }

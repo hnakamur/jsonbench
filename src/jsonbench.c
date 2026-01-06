@@ -273,6 +273,16 @@ strcpy(available_engines[engine_count++], "NLOHMANNJSON");
                 ts_diff.tv_sec  = 0;
                 ts_diff.tv_nsec = 0;
                 timespec_diff(&ts_after, &ts_before, &ts_diff);
+
+                /* Output result buffer if not in silence mode */
+                if (!silence) {
+                    const char* result_buffer = nl_get_result_buffer(json);
+                    size_t result_size = nl_get_result_buffer_size(json);
+                    if (result_buffer != NULL && result_size > 0) {
+                        printf("%s", result_buffer);
+                    }
+                }
+
                 nl_json_cleanup(json);
                 printf("\nTime: %ld.%09ld usec\n\n", (long)ts_diff.tv_sec, ts_diff.tv_nsec);
             }

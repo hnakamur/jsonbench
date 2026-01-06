@@ -26,7 +26,9 @@ class NLSAXHandler : public nlohmann::json_sax<nlohmann::json>{
     m_arg_num_limit(0),
     m_arg_num_limit_exceeded(false),
     m_silence(false)
-    {};
+    {
+        m_result_buffer.reserve(4096);  // Start with 4KB capacity
+    };
     ~NLSAXHandler() {};
 
     static bool init() {
@@ -69,7 +71,13 @@ class NLSAXHandler : public nlohmann::json_sax<nlohmann::json>{
         }
         argval.replace(0, value.size(), value);
         argval.resize(value.size());
-        std::cout << argname << ": " << argval << std::endl;
+
+        /* Append to result buffer instead of printing to stdout */
+        m_result_buffer += argname;
+        m_result_buffer += ": ";
+        m_result_buffer += argval;
+        m_result_buffer += "\n";
+
         m_arg_num_counter++;
         if (m_arg_num_limit > 0 &&
             m_arg_num_counter > m_arg_num_limit) {
@@ -244,6 +252,10 @@ class NLSAXHandler : public nlohmann::json_sax<nlohmann::json>{
         }
     }
 
+    std::string getResultBuffer() const {
+        return m_result_buffer;
+    }
+
     private:
     double         m_max_depth;
     int64_t        m_current_depth;
@@ -256,6 +268,7 @@ class NLSAXHandler : public nlohmann::json_sax<nlohmann::json>{
     long int       m_arg_num_limit;
     bool           m_arg_num_limit_exceeded;
     bool           m_silence;
+    std::string    m_result_buffer;
 
 };
 
@@ -323,6 +336,16 @@ extern "C" int nl_set_silence(nl_parser *parser, int silence) {
 extern "C" int nl_parser_cleanup(nl_parser *parser) {
     parser->impl->~NLSAXHandler();
     return 0;
+}
+
+extern "C" const char* nl_get_result_buffer(nl_parser *parser) {
+    if (!parser || !parser->impl) return nullptr;
+    return parser->impl->getResultBuffer().c_str();
+}
+
+extern "C" size_t nl_get_result_buffer_size(nl_parser *parser) {
+    if (!parser || !parser->impl) return 0;
+    return parser->impl->getResultBuffer().size();
 }
 
 #endif
