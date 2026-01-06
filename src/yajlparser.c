@@ -47,7 +47,35 @@ static int json_add_argument(yajl_json_data *p, const unsigned char *value, unsi
     }
     memcpy(argval, value, length);
     argval[length] = '\0';
-    printf("%s: %s\n", argname, argval);
+
+    /* Append to result buffer instead of printing to stdout */
+    size_t argname_len = strlen(argname);
+    size_t argval_len = strlen(argval);
+    size_t needed_size = argname_len + 2 + argval_len + 1; /* "name: value\n" */
+
+    if (p->result_buffer_size + needed_size > p->result_buffer_capacity) {
+        /* Grow buffer - double the capacity or use needed size, whichever is larger */
+        size_t new_capacity = p->result_buffer_capacity * 2;
+        if (new_capacity < p->result_buffer_size + needed_size) {
+            new_capacity = p->result_buffer_size + needed_size;
+        }
+        char *new_buffer = realloc(p->result_buffer, new_capacity);
+        if (new_buffer == NULL) {
+            printf("Failed to allocate memory for result buffer\n");
+            return 0;
+        }
+        p->result_buffer = new_buffer;
+        p->result_buffer_capacity = new_capacity;
+    }
+
+    /* Append "argname: argval\n" to buffer */
+    int written = snprintf(p->result_buffer + p->result_buffer_size,
+                          p->result_buffer_capacity - p->result_buffer_size,
+                          "%s: %s\n", argname, argval);
+    if (written > 0) {
+        p->result_buffer_size += written;
+    }
+
     p->current_arg_num++;
     if (p->current_arg_num > p->arg_num_limit) {
         p->arg_num_limit_exceeded = 1;
@@ -298,6 +326,15 @@ int yajl_json_init(yajl_json_data **json, char **error_msg) {
     (*json)->silence                = 0;
 
     /**
+     * Initialize result buffer with initial capacity
+     */
+    (*json)->result_buffer_capacity = 4096;  /* Start with 4KB */
+    (*json)->result_buffer = (char *) malloc((*json)->result_buffer_capacity);
+    if ((*json)->result_buffer == NULL) return -1;
+    (*json)->result_buffer[0] = '\0';
+    (*json)->result_buffer_size = 0;
+
+    /**
      * yajl initialization
      *
      * yajl_parser_config definition:
@@ -363,6 +400,7 @@ int yajl_json_cleanup(yajl_json_data *json) {
     }
     free(json->prefix);
     free(json->current_key);
+    free(json->result_buffer);
     free(json);
 
     return 1;

@@ -27,6 +27,11 @@ struct yajl_json_data {
     long int       arg_num_limit;            // cppcheck-suppress unusedStructMember
     int            arg_num_limit_exceeded;   // cppcheck-suppress unusedStructMember
     int            silence;                  // cppcheck-suppress unusedStructMember
+
+    /* dynamic buffer for storing results */
+    char          *result_buffer;            // cppcheck-suppress unusedStructMember
+    size_t         result_buffer_size;       // cppcheck-suppress unusedStructMember
+    size_t         result_buffer_capacity;   // cppcheck-suppress unusedStructMember
 };
 
 int yajl_json_init(yajl_json_data **json, char **error_msg);
