@@ -10,7 +10,7 @@
     }
   },
 
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y build-essential autoconf automake libtool pkg-config libyajl-dev rapidjson-dev nlohmann-json3-dev librapidcheck-dev",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y build-essential autoconf automake libtool pkg-config libyajl-dev rapidjson-dev nlohmann-json3-dev librapidcheck-dev googletest",
 
   "customizations": {
     "vscode": {
