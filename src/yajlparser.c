@@ -390,6 +390,13 @@ int yajl_json_init(yajl_json_data **json, char **error_msg) {
 }
 
 /**
+ * Allow partial processing of JSON data.
+ */
+void yajl_json_allow_partial(yajl_json_data *json) {
+    yajl_config(json->handle, yajl_allow_partial_values, 1);
+}
+
+/**
  * Feed one chunk of data to the JSON parser.
  */
 int yajl_json_process_chunk(yajl_json_data *json, const char *buf, unsigned int size, char **error_msg) {
@@ -426,6 +433,28 @@ int yajl_json_process_chunk(yajl_json_data *json, const char *buf, unsigned int 
             json_add_error(json, (char *)yajl_err);
             yajl_free_error(json->handle, yajl_err);
         }
+        return -1;
+    }
+
+    return 1;
+}
+
+/**
+ * Complete the JSON parsing and check if the input was valid and complete.
+ */
+int yajl_json_complete(yajl_json_data *json, char **error_msg) {
+    assert(json != NULL);
+    assert(error_msg != NULL);
+    *error_msg = NULL;
+
+    /* Call yajl_complete_parse to finalize parsing */
+    json->status = yajl_complete_parse(json->handle);
+
+    if (json->status != yajl_status_ok) {
+        unsigned char* yajl_err = yajl_get_error(json->handle, 0, NULL, 0);
+        *error_msg = strdup((char *)yajl_err);
+        json_add_error(json, (char *)yajl_err);
+        yajl_free_error(json->handle, yajl_err);
         return -1;
     }
 

@@ -41,6 +41,8 @@ struct yajl_json_data {
 
 int yajl_json_init(yajl_json_data **json, char **error_msg);
 
+void yajl_json_allow_partial(yajl_json_data *json);
+
 int yajl_json_process(yajl_json_data *json, const char *buf,
     unsigned int size, char **error_msg);
 

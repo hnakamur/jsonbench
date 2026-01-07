@@ -56,6 +56,7 @@ static void showhelp(void) {
     printf("\t-d\tSet maximum depth of JSON structure, default: %d\n", LIMIT_DEPTH);
     printf("\t-a\tSet maximum number of possible ARGS, default: %d\n", LIMIT_ARG_NUM);
     printf("\t-s\tBe silence; don't print out the parsed data\n");
+    printf("\t-p\tAllow partial JSON values (YAJL only)\n");
     if (engine_count > 0) {
         printf("\t-e\tUse JSON engine\n");
         printf("\t-c\tCompare engines (comma-separated, e.g., RAPIDJSON,NLOHMANNJSON)\n");
@@ -276,7 +277,7 @@ static int process_file_get_result(const char *jsonfile, const char *jsonengine,
 }
 
 static int process_file(const char *jsonfile, const char *jsonengine,
-                       unsigned int depth_limit, unsigned int arg_limit, int silence) {
+                       unsigned int depth_limit, unsigned int arg_limit, int silence, int allow_partial) {
     char *error_msg;
     unsigned int length = 0;
     char data[FILE_BUFFER_SIZE];
@@ -309,10 +310,20 @@ static int process_file(const char *jsonfile, const char *jsonengine,
             json->arg_num_limit = arg_limit;
             json->silence       = silence;
 
+            if (allow_partial) {
+                yajl_json_allow_partial(json);
+            }
+
             clock_gettime(CLOCK_REALTIME, &ts_before);
             if (yajl_json_process_chunk(json, data, length, &error_msg) < 0) {
                 printf("Error: %s\n", error_msg);
                 free(error_msg);
+            } else {
+                /* Complete the parsing to check if JSON is valid and complete */
+                if (yajl_json_complete(json, &error_msg) < 0) {
+                    printf("Error: %s\n", error_msg);
+                    free(error_msg);
+                }
             }
             clock_gettime(CLOCK_REALTIME, &ts_after);
             ts_diff.tv_sec  = 0;
@@ -554,7 +565,7 @@ static int compare_directory(const char *dirname, const char *base_engine,
 }
 
 static int process_directory(const char *dirname, const char *jsonengine,
-                            unsigned int depth_limit, unsigned int arg_limit, int silence) {
+                            unsigned int depth_limit, unsigned int arg_limit, int silence, int allow_partial) {
     DIR *dir;
     struct dirent *entry;
     char filepath[PATH_MAX];
@@ -573,9 +584,9 @@ static int process_directory(const char *dirname, const char *jsonengine,
         snprintf(filepath, sizeof(filepath), "%s/%s", dirname, entry->d_name);
 
         if (is_directory(filepath)) {
-            process_directory(filepath, jsonengine, depth_limit, arg_limit, silence);
+            process_directory(filepath, jsonengine, depth_limit, arg_limit, silence, allow_partial);
         } else {
-            process_file(filepath, jsonengine, depth_limit, arg_limit, silence);
+            process_file(filepath, jsonengine, depth_limit, arg_limit, silence, allow_partial);
         }
     }
 
@@ -597,6 +608,7 @@ int main(int argc, char ** argv) {
     unsigned int   depth_limit = LIMIT_DEPTH;
     unsigned int   arg_limit   = LIMIT_ARG_NUM;
     int            silence = 0;
+    int            allow_partial = 0;
 
 #ifdef HAVE_YAJL
 strcpy(available_engines[engine_count++], "YAJL");
@@ -610,7 +622,7 @@ strcpy(available_engines[engine_count++], "RAPIDJSON");
 strcpy(available_engines[engine_count++], "NLOHMANNJSON");
 #endif
 
-    while ((c = getopt(argc, argv, "he:c:a:d:s")) != -1) {
+    while ((c = getopt(argc, argv, "he:c:a:d:sp")) != -1) {
         switch (c) {
             case 'h':
                 showhelp();
@@ -676,6 +688,9 @@ strcpy(available_engines[engine_count++], "NLOHMANNJSON");
             case 's':
                 silence = 1;
                 break;
+            case 'p':
+                allow_partial = 1;
+                break;
             default:
                 showhelp();
                 return 0;
@@ -721,9 +736,9 @@ strcpy(available_engines[engine_count++], "NLOHMANNJSON");
     /* Normal mode */
     else if (jsonengine != NULL) {
         if (is_directory(jsonfile)) {
-            process_directory(jsonfile, jsonengine, depth_limit, arg_limit, silence);
+            process_directory(jsonfile, jsonengine, depth_limit, arg_limit, silence, allow_partial);
         } else {
-            process_file(jsonfile, jsonengine, depth_limit, arg_limit, silence);
+            process_file(jsonfile, jsonengine, depth_limit, arg_limit, silence, allow_partial);
         }
 
         free(jsonengine);
