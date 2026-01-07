@@ -9,6 +9,37 @@
 
 const char *base_offset=NULL;
 
+static void json_add_error(yajl_json_data *p, const char *error_msg)
+{
+    assert(p != NULL);
+    assert(error_msg != NULL);
+
+    size_t error_len = strlen(error_msg);
+    size_t needed_size = p->error_buffer_size + error_len + 1; /* +1 for newline */
+
+    if (needed_size > p->error_buffer_capacity) {
+        /* Grow buffer - double the capacity or use needed size, whichever is larger */
+        size_t new_capacity = p->error_buffer_capacity * 2;
+        if (new_capacity < needed_size) {
+            new_capacity = needed_size;
+        }
+        char *new_buffer = realloc(p->error_buffer, new_capacity);
+        if (new_buffer == NULL) {
+            return; /* Silently fail if we can't allocate memory */
+        }
+        p->error_buffer = new_buffer;
+        p->error_buffer_capacity = new_capacity;
+    }
+
+    /* Append "error_msg\n" to buffer */
+    int written = snprintf(p->error_buffer + p->error_buffer_size,
+                          p->error_buffer_capacity - p->error_buffer_size,
+                          "%s\n", error_msg);
+    if (written > 0) {
+        p->error_buffer_size += written;
+    }
+}
+
 static int json_add_argument(yajl_json_data *p, const unsigned char *value, unsigned length)
 {
     assert(p != NULL);
@@ -25,7 +56,7 @@ static int json_add_argument(yajl_json_data *p, const unsigned char *value, unsi
      */
     if (p->prefix_len > 0) {
         if (p->prefix_len + 1 + p->current_key_len >= JSON_STRING_SIZE) {
-            printf("Argument name too long\n");
+            json_add_error(p, "Argument name too long");
             return 0;
         }
         memcpy(argname, p->prefix, p->prefix_len);
@@ -35,14 +66,14 @@ static int json_add_argument(yajl_json_data *p, const unsigned char *value, unsi
     }
     else {
         if (p->current_key_len >= JSON_STRING_SIZE) {
-            printf("Argument name too long\n");
+            json_add_error(p, "Argument name too long");
             return 0;
         }
         memcpy(argname, p->current_key, p->current_key_len);
         argname[p->current_key_len] = '\0';
     }
     if (length >= JSON_STRING_SIZE) {
-        printf("Argument value too long\n");
+        json_add_error(p, "Argument value too long");
         return 0;
     }
     memcpy(argval, value, length);
@@ -61,7 +92,7 @@ static int json_add_argument(yajl_json_data *p, const unsigned char *value, unsi
         }
         char *new_buffer = realloc(p->result_buffer, new_capacity);
         if (new_buffer == NULL) {
-            printf("Failed to allocate memory for result buffer\n");
+            json_add_error(p, "Failed to allocate memory for result buffer");
             return 0;
         }
         p->result_buffer = new_buffer;
@@ -335,6 +366,15 @@ int yajl_json_init(yajl_json_data **json, char **error_msg) {
     (*json)->result_buffer_size = 0;
 
     /**
+     * Initialize error buffer with initial capacity
+     */
+    (*json)->error_buffer_capacity = 4096;  /* Start with 4KB */
+    (*json)->error_buffer = (char *) malloc((*json)->error_buffer_capacity);
+    if ((*json)->error_buffer == NULL) return -1;
+    (*json)->error_buffer[0] = '\0';
+    (*json)->error_buffer_size = 0;
+
+    /**
      * yajl initialization
      *
      * yajl_parser_config definition:
@@ -401,6 +441,7 @@ int yajl_json_cleanup(yajl_json_data *json) {
     free(json->prefix);
     free(json->current_key);
     free(json->result_buffer);
+    free(json->error_buffer);
     free(json);
 
     return 1;

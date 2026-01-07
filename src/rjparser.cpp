@@ -36,6 +36,11 @@ class RJSAXHandler {
         return true;
     }
 
+    void addError(const std::string& error_msg) {
+        m_error_buffer += error_msg;
+        m_error_buffer += "\n";
+    }
+
     bool addArgument(const std::string& value) {
         if (m_silence) {
             return true;
@@ -48,7 +53,7 @@ class RJSAXHandler {
          */
         if(m_prefix_len > 0) {
             if (m_prefix_len + 1 + m_current_key_len >= JSON_STRING_SIZE) {
-                std::cerr << "Argument name too long" << std::endl;
+                addError("Argument name too long");
                 return false;
             }
             argname.replace(0, m_prefix_len, m_prefix.substr(0, m_prefix_len));
@@ -59,7 +64,7 @@ class RJSAXHandler {
         }
         else {
             if (m_current_key_len >= JSON_STRING_SIZE) {
-                std::cerr << "Argument name too long" << std::endl;
+                addError("Argument name too long");
                 return false;
             }
             argname.replace(0, m_current_key_len,
@@ -67,7 +72,7 @@ class RJSAXHandler {
             argname.resize(m_current_key_len);
         }
         if (value.size() >= JSON_STRING_SIZE) {
-            std::cerr << "Argument value too long" << std::endl;
+            addError("Argument value too long");
             return false;
         }
         argval.replace(0, value.size(), value);
@@ -83,7 +88,7 @@ class RJSAXHandler {
         if (m_arg_num_limit > 0 &&
             m_arg_num_counter > m_arg_num_limit) {
             m_arg_num_limit_exceeded = true;
-            std::cerr << "Argument number limit exceeded" << std::endl;
+            addError("Argument number limit exceeded");
             return false;
         }
         return true;
@@ -276,6 +281,7 @@ class RJSAXHandler {
     bool           m_arg_num_limit_exceeded;
     bool           m_silence;
     std::string    m_result_buffer;
+    std::string    m_error_buffer;
 
 };
 

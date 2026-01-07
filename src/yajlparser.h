@@ -32,6 +32,11 @@ struct yajl_json_data {
     char          *result_buffer;            // cppcheck-suppress unusedStructMember
     size_t         result_buffer_size;       // cppcheck-suppress unusedStructMember
     size_t         result_buffer_capacity;   // cppcheck-suppress unusedStructMember
+
+    /* dynamic buffer for storing error messages */
+    char          *error_buffer;             // cppcheck-suppress unusedStructMember
+    size_t         error_buffer_size;        // cppcheck-suppress unusedStructMember
+    size_t         error_buffer_capacity;    // cppcheck-suppress unusedStructMember
 };
 
 int yajl_json_init(yajl_json_data **json, char **error_msg);
