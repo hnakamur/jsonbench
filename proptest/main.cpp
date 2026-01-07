@@ -12,26 +12,28 @@ extern "C" {
 
 // Helper function to compare parser results
 bool compareParserResults(const char* json_input) {
-    char *error_msg = nullptr;
+    char *nl_error_msg = nullptr;
+    char *rj_error_msg = nullptr;
+    char *yajl_error_msg = nullptr;
 
     // Initialize parsers
     nl_parser *nl_p = nullptr;
     rj_parser *rj_p = nullptr;
     yajl_json_data *yajl_p = nullptr;
 
-    if (nl_json_init(&nl_p, &error_msg) != 0) {
-        if (error_msg) free(error_msg);
+    if (nl_json_init(&nl_p, &nl_error_msg) != 0) {
+        if (nl_error_msg) free(nl_error_msg);
         return false;
     }
-    if (rj_json_init(&rj_p, &error_msg) != 0) {
+    if (rj_json_init(&rj_p, &rj_error_msg) != 0) {
         nl_json_cleanup(nl_p);
-        if (error_msg) free(error_msg);
+        if (rj_error_msg) free(rj_error_msg);
         return false;
     }
-    if (yajl_json_init(&yajl_p, &error_msg) != 1) {
+    if (yajl_json_init(&yajl_p, &yajl_error_msg) != 1) {
         nl_json_cleanup(nl_p);
         rj_json_cleanup(rj_p);
-        if (error_msg) free(error_msg);
+        if (yajl_error_msg) free(yajl_error_msg);
         return false;
     }
 
@@ -49,14 +51,9 @@ bool compareParserResults(const char* json_input) {
     rj_set_max_arg_num(rj_p, 500);
 
     // Parse with all three parsers
-    int nl_success = (nl_parse_buffer(nl_p, json_input, strlen(json_input), &error_msg) == 0);
-    if (error_msg) { free(error_msg); error_msg = nullptr; }
-
-    int rj_success = (rj_parse_buffer(rj_p, json_input, strlen(json_input), &error_msg) == 0);
-    if (error_msg) { free(error_msg); error_msg = nullptr; }
-
-    int yajl_success = (yajl_json_process_chunk(yajl_p, json_input, strlen(json_input), &error_msg) == 1);
-    if (error_msg) { free(error_msg); error_msg = nullptr; }
+    int nl_success = (nl_parse_buffer(nl_p, json_input, strlen(json_input), &nl_error_msg) == 0);
+    int rj_success = (rj_parse_buffer(rj_p, json_input, strlen(json_input), &rj_error_msg) == 0);
+    int yajl_success = (yajl_json_process_chunk(yajl_p, json_input, strlen(json_input), &yajl_error_msg) == 1);
 
     // All parsers should agree on success/failure
     bool results_agree = (nl_success == yajl_success) && (rj_success == yajl_success);
@@ -68,25 +65,39 @@ bool compareParserResults(const char* json_input) {
                  << " yajl=" << yajl_success
                  << " input='" << json_input << "'\n";
 
-        // Output error buffers for parsers that failed
+        // Output error messages and error buffers for parsers that failed
         if (!nl_success) {
+            if (nl_error_msg) {
+                RC_LOG() << "  nl error_msg: " << nl_error_msg;
+            }
             const char* nl_error = nl_get_error_buffer(nl_p);
             if (nl_error && strlen(nl_error) > 0) {
-                RC_LOG() << "  nl error: " << nl_error;
+                RC_LOG() << "  nl error_buffer: " << nl_error;
             }
         }
         if (!rj_success) {
+            if (rj_error_msg) {
+                RC_LOG() << "  rj error_msg: " << rj_error_msg;
+            }
             const char* rj_error = rj_get_error_buffer(rj_p);
             if (rj_error && strlen(rj_error) > 0) {
-                RC_LOG() << "  rj error: " << rj_error;
+                RC_LOG() << "  rj error_buffer: " << rj_error;
             }
         }
         if (!yajl_success) {
+            if (yajl_error_msg) {
+                RC_LOG() << "  yajl error_msg: " << yajl_error_msg;
+            }
             if (yajl_p->error_buffer && yajl_p->error_buffer_size > 0) {
-                RC_LOG() << "  yajl error: " << yajl_p->error_buffer;
+                RC_LOG() << "  yajl error_buffer: " << yajl_p->error_buffer;
             }
         }
     }
+
+    // Free error messages
+    if (nl_error_msg) { free(nl_error_msg); nl_error_msg = nullptr; }
+    if (rj_error_msg) { free(rj_error_msg); rj_error_msg = nullptr; }
+    if (yajl_error_msg) { free(yajl_error_msg); yajl_error_msg = nullptr; }
 
     // If all succeeded, compare output buffers
     if (results_agree && yajl_success) {
