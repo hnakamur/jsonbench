@@ -1,0 +1,3 @@
+[submodule "libs/jsonsl"]
+	path = libs/jsonsl
+	url = https://github.com/mnunberg/jsonsl
