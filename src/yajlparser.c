@@ -406,6 +406,7 @@ int yajl_json_process_chunk(yajl_json_data *json, const char *buf, unsigned int 
             if (json->depth_limit_exceeded != 0) {
                 const char * err = "JSON depth limit exceeded";
                 *error_msg = strdup(err);
+                json_add_error(json, err);
             }
             if (json->arg_num_limit_exceeded != 0) {
                 const char * err = "ARGUMENT number limit exceeded";
@@ -416,11 +417,13 @@ int yajl_json_process_chunk(yajl_json_data *json, const char *buf, unsigned int 
                     *error_msg = realloc(*error_msg, strlen(*error_msg) + strlen(err) + 1);
                     strcat(*error_msg, err);
                 }
+                json_add_error(json, err);
             }
         }
         else {
             unsigned char* yajl_err = yajl_get_error(json->handle, 0, (unsigned char *)buf, size);
             *error_msg = strdup((char *)yajl_err);
+            json_add_error(json, (char *)yajl_err);
             yajl_free_error(json->handle, yajl_err);
         }
         return -1;

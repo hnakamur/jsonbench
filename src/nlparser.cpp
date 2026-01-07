@@ -261,6 +261,10 @@ class NLSAXHandler : public nlohmann::json_sax<nlohmann::json>{
         return m_result_buffer;
     }
 
+    const std::string& getErrorBuffer() const {
+        return m_error_buffer;
+    }
+
     private:
     double         m_max_depth;
     int64_t        m_current_depth;
@@ -318,7 +322,7 @@ extern "C" int nl_parse_buffer(nl_parser *parser, const char *buf, unsigned int 
     bool ok = nlohmann::json::sax_parse(buf, buf + len, parser->impl);
 
     if (!ok) {
-        fprintf(stderr, "NlohmannJSON error: parsing failed\n");
+        parser->impl->addError("NlohmannJSON error: parsing failed");
         return 2;
     }
     return 0;
@@ -352,6 +356,16 @@ extern "C" const char* nl_get_result_buffer(nl_parser *parser) {
 extern "C" size_t nl_get_result_buffer_size(nl_parser *parser) {
     if (!parser || !parser->impl) return 0;
     return parser->impl->getResultBuffer().size();
+}
+
+extern "C" const char* nl_get_error_buffer(nl_parser *parser) {
+    if (!parser || !parser->impl) return nullptr;
+    return parser->impl->getErrorBuffer().c_str();
+}
+
+extern "C" size_t nl_get_error_buffer_size(nl_parser *parser) {
+    if (!parser || !parser->impl) return 0;
+    return parser->impl->getErrorBuffer().size();
 }
 
 #endif

@@ -18,6 +18,8 @@ int nl_set_silence(nl_parser *parser, int silence);
 int nl_json_cleanup(nl_parser *parser);
 const char* nl_get_result_buffer(nl_parser *parser);
 size_t nl_get_result_buffer_size(nl_parser *parser);
+const char* nl_get_error_buffer(nl_parser *parser);
+size_t nl_get_error_buffer_size(nl_parser *parser);
 
 #ifdef __cplusplus
 }

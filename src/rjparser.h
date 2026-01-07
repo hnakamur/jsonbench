@@ -18,6 +18,8 @@ int rj_set_silence(rj_parser *parser, int silence);
 int rj_json_cleanup(rj_parser *parser);
 const char* rj_get_result_buffer(rj_parser *parser);
 size_t rj_get_result_buffer_size(rj_parser *parser);
+const char* rj_get_error_buffer(rj_parser *parser);
+size_t rj_get_error_buffer_size(rj_parser *parser);
 
 #ifdef __cplusplus
 }

@@ -268,6 +268,10 @@ class RJSAXHandler {
         return m_result_buffer;
     }
 
+    const std::string& getErrorBuffer() const {
+        return m_error_buffer;
+    }
+
     private:
     double         m_max_depth;
     int64_t        m_current_depth;
@@ -327,8 +331,11 @@ extern "C" int rj_parse_buffer(rj_parser *parser, const char *buf, unsigned int 
 
     rapidjson::ParseResult pr = reader.Parse(ss, (parser)->impl);
     if (!pr) {
-        fprintf(stderr, "RapidJSON error: %s at %zu\n",
-                rapidjson::GetParseError_En(pr.Code()), pr.Offset());
+        char error_buffer[256];
+        snprintf(error_buffer, sizeof(error_buffer),
+                 "RapidJSON error: %s at %zu",
+                 rapidjson::GetParseError_En(pr.Code()), pr.Offset());
+        parser->impl.addError(error_buffer);
         return 2;
     }
     return 0;
@@ -362,6 +369,16 @@ extern "C" const char* rj_get_result_buffer(rj_parser *parser) {
 extern "C" size_t rj_get_result_buffer_size(rj_parser *parser) {
     if (!parser) return 0;
     return parser->impl.getResultBuffer().size();
+}
+
+extern "C" const char* rj_get_error_buffer(rj_parser *parser) {
+    if (!parser) return nullptr;
+    return parser->impl.getErrorBuffer().c_str();
+}
+
+extern "C" size_t rj_get_error_buffer_size(rj_parser *parser) {
+    if (!parser) return 0;
+    return parser->impl.getErrorBuffer().size();
 }
 
 #endif

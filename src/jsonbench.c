@@ -324,6 +324,11 @@ static int process_file(const char *jsonfile, const char *jsonengine,
                 printf("%s", json->result_buffer);
             }
 
+            /* Output error buffer if not in silence mode and there are errors */
+            if (!json->silence && json->error_buffer != NULL && json->error_buffer_size > 0) {
+                fprintf(stderr, "%s", json->error_buffer);
+            }
+
             yajl_json_cleanup(json);
             printf("\nTime: %ld.%09ld usec\n\n", (long)ts_diff.tv_sec, ts_diff.tv_nsec);
         }
@@ -349,6 +354,17 @@ static int process_file(const char *jsonfile, const char *jsonengine,
             fprintf(stderr, "Parse failed with code %d\n", rc);
             fprintf(stderr, "Error: %s\n", error_msg);
             free(error_msg);
+
+            /* Output error buffer if not in silence mode and there are errors */
+            if (!silence) {
+                const char* error_buffer = rj_get_error_buffer(json);
+                size_t error_size = rj_get_error_buffer_size(json);
+                if (error_buffer != NULL && error_size > 0) {
+                    fprintf(stderr, "%s", error_buffer);
+                }
+            }
+
+            rj_json_cleanup(json);
             return 3;
         }
         else {
@@ -363,6 +379,15 @@ static int process_file(const char *jsonfile, const char *jsonengine,
                 size_t result_size = rj_get_result_buffer_size(json);
                 if (result_buffer != NULL && result_size > 0) {
                     printf("%s", result_buffer);
+                }
+            }
+
+            /* Output error buffer if not in silence mode and there are errors */
+            if (!silence) {
+                const char* error_buffer = rj_get_error_buffer(json);
+                size_t error_size = rj_get_error_buffer_size(json);
+                if (error_buffer != NULL && error_size > 0) {
+                    fprintf(stderr, "%s", error_buffer);
                 }
             }
 
@@ -392,6 +417,17 @@ static int process_file(const char *jsonfile, const char *jsonengine,
             fprintf(stderr, "Parse failed with code %d\n", rc);
             fprintf(stderr, "Error: %s\n", error_msg);
             free(error_msg);
+
+            /* Output error buffer if not in silence mode and there are errors */
+            if (!silence) {
+                const char* error_buffer = nl_get_error_buffer(json);
+                size_t error_size = nl_get_error_buffer_size(json);
+                if (error_buffer != NULL && error_size > 0) {
+                    fprintf(stderr, "%s", error_buffer);
+                }
+            }
+
+            nl_json_cleanup(json);
             return 3;
         }
         else {
@@ -406,6 +442,15 @@ static int process_file(const char *jsonfile, const char *jsonengine,
                 size_t result_size = nl_get_result_buffer_size(json);
                 if (result_buffer != NULL && result_size > 0) {
                     printf("%s", result_buffer);
+                }
+            }
+
+            /* Output error buffer if not in silence mode and there are errors */
+            if (!silence) {
+                const char* error_buffer = nl_get_error_buffer(json);
+                size_t error_size = nl_get_error_buffer_size(json);
+                if (error_buffer != NULL && error_size > 0) {
+                    fprintf(stderr, "%s", error_buffer);
                 }
             }
 
