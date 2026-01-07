@@ -5,6 +5,7 @@
 #include <vector>
 #include <deque>
 #include <string>
+#include <sstream>
 
 #ifdef HAVE_NLOHMANNJSON
 
@@ -229,9 +230,12 @@ class NLSAXHandler : public nlohmann::json_sax<nlohmann::json>{
         return true;
     }
 
-    bool parse_error(std::size_t,
-                     const std::string&,
-                     const nlohmann::detail::exception&) override {
+    bool parse_error(std::size_t position,
+                     const std::string& last_token,
+                     const nlohmann::detail::exception& ex) override {
+        std::ostringstream oss;
+        oss << "parse error, position=" << position << ", last_token=" << last_token << ", ex=" << ex.what();
+        addError(oss.str());
         return false;
     }
 
