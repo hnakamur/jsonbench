@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../config.h"
 #include "yajlparser.h"
+#include "jsoncparser.h"
 #include "rjparser.h"
 #include "nlparser.h"
 #include <unistd.h>
@@ -203,6 +204,42 @@ static int process_file_get_result(const char *jsonfile, const char *jsonengine,
         }
     }
 #endif
+#if HAVE_JSONC
+    if (strcmp(jsonengine, "JSONC") == 0) {
+        jsonc_json_data *json = NULL;
+        jsonc_json_init(&json, &error_msg);
+
+        if (json != NULL) {
+            json->depth_limit   = depth_limit;
+            json->arg_num_limit = arg_limit;
+            json->silence       = 1;
+
+            if (jsonc_json_process_chunk(json, data, length, &error_msg) < 0) {
+                fprintf(stderr, "Error: %s\n", error_msg);
+                free(error_msg);
+                jsonc_json_cleanup(json);
+                return EXIT_FAILURE;
+            }
+
+            if (jsonc_json_complete(json, &error_msg) < 0) {
+                fprintf(stderr, "Error: %s\n", error_msg);
+                free(error_msg);
+                jsonc_json_cleanup(json);
+                return EXIT_FAILURE;
+            }
+
+            if (json->result_buffer != NULL && json->result_buffer_size > 0) {
+                *result_buffer = malloc(json->result_buffer_size);
+                if (*result_buffer != NULL) {
+                    memcpy(*result_buffer, json->result_buffer, json->result_buffer_size);
+                    *result_size = json->result_buffer_size;
+                }
+            }
+
+            jsonc_json_cleanup(json);
+        }
+    }
+#endif
 #if HAVE_RAPIDJSON
     if (strcmp(jsonengine, "RAPIDJSON") == 0) {
         rj_parser *json = NULL;
@@ -341,6 +378,52 @@ static int process_file(const char *jsonfile, const char *jsonengine,
             }
 
             yajl_json_cleanup(json);
+            printf("\nTime: %ld.%09ld usec\n\n", (long)ts_diff.tv_sec, ts_diff.tv_nsec);
+        }
+    }
+#endif
+#if HAVE_JSONC
+    if (strcmp(jsonengine, "JSONC") == 0) {
+        jsonc_json_data *json = NULL;
+        jsonc_json_init(&json, &error_msg);
+
+        if (json != NULL) {
+
+            json->depth_limit   = depth_limit;
+            json->arg_num_limit = arg_limit;
+            json->silence       = silence;
+
+            if (allow_partial) {
+                jsonc_json_allow_partial(json);
+            }
+
+            clock_gettime(CLOCK_REALTIME, &ts_before);
+            if (jsonc_json_process_chunk(json, data, length, &error_msg) < 0) {
+                printf("Error: %s\n", error_msg);
+                free(error_msg);
+            } else {
+                /* Complete the parsing to check if JSON is valid and complete */
+                if (jsonc_json_complete(json, &error_msg) < 0) {
+                    printf("Error: %s\n", error_msg);
+                    free(error_msg);
+                }
+            }
+            clock_gettime(CLOCK_REALTIME, &ts_after);
+            ts_diff.tv_sec  = 0;
+            ts_diff.tv_nsec = 0;
+            timespec_diff(&ts_after, &ts_before, &ts_diff);
+
+            /* Output result buffer if not in silence mode */
+            if (!json->silence && json->result_buffer != NULL && json->result_buffer_size > 0) {
+                printf("%s", json->result_buffer);
+            }
+
+            /* Output error buffer if not in silence mode and there are errors */
+            if (!json->silence && json->error_buffer != NULL && json->error_buffer_size > 0) {
+                fprintf(stderr, "%s", json->error_buffer);
+            }
+
+            jsonc_json_cleanup(json);
             printf("\nTime: %ld.%09ld usec\n\n", (long)ts_diff.tv_sec, ts_diff.tv_nsec);
         }
     }
@@ -612,6 +695,10 @@ int main(int argc, char ** argv) {
 
 #ifdef HAVE_YAJL
 strcpy(available_engines[engine_count++], "YAJL");
+#endif
+
+#ifdef HAVE_JSONC
+strcpy(available_engines[engine_count++], "JSONC");
 #endif
 
 #ifdef HAVE_RAPIDJSON

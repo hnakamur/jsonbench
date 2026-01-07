@@ -4,6 +4,6 @@ AM_LDFLAGS= $(YAJL_LDFLAGS)
 
 bin_PROGRAMS = jsonbench
 
-jsonbench_SOURCES = yajlparser.c rjparser.cpp nlparser.cpp jsonbench.c
-jsonbench_CFLAGS = $(AM_CFLAGS) $(YAJL_CFLAGS)
-jsonbench_LDADD = $(YAJL_LDADD)
+jsonbench_SOURCES = yajlparser.c jsoncparser.c rjparser.cpp nlparser.cpp jsonbench.c
+jsonbench_CFLAGS = $(AM_CFLAGS) $(YAJL_CFLAGS) $(JSONC_CFLAGS)
+jsonbench_LDADD = $(YAJL_LDADD) $(JSONC_LDADD)

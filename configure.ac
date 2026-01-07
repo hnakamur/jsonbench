@@ -111,6 +111,81 @@ fi
 
 dnl # END try to find YAJL
 
+dnl # BEGIN try to find JSON-C
+jsonc_header_exists="no"
+jsonc_lib_exists="no"
+
+dnl # Try known package names
+JSONC_CONFIG=${PKG_CONFIG}
+JSONC_PKGNAMES="json-c"
+
+OLDIFS=$IFS
+
+dnl Check if we want to use json-c or not
+AC_MSG_CHECKING([whether to use json-c])
+AC_ARG_WITH(
+    [jsonc],
+    [AS_HELP_STRING([--with-jsonc], [Enable json-c (default is enabled if exists)])],
+    [case "$withval" in
+        yes) wantjsonc=yes ;;
+        no)  wantjsonc=no; AC_DEFINE([HAVE_JSONC], [0], [Mark that user does not want JSON-C]) ;;
+        *)   AC_MSG_ERROR([Invalid value for --with-feature: $withval]) ;;
+    esac],
+    [wantjsonc="notset"]
+)
+
+if test "$wantjsonc" != "no"; then
+    if test -n "${JSONC_CONFIG}"; then
+        JSONC_PKGNAME=""
+        for x in ${JSONC_PKGNAMES}; do
+            export IFS=":"
+            for p in $PKGPATH; do
+                AC_MSG_RESULT([PKG_CONFIG_PATH=${p} ${JSONC_CONFIG} --exists ${x}])
+                if PKG_CONFIG_PATH=${p} ${JSONC_CONFIG} --exists ${x}; then
+                    JSONC_PKGNAME="$x"
+                    break
+                fi
+            done
+            unset IFS
+        done
+    fi
+    export IFS=$OLDIFS
+
+    if test -n "${JSONC_PKGNAME}"; then
+        AC_MSG_RESULT([${JSONC_CONFIG}])
+        JSONC_VERSION="`${JSONC_CONFIG} ${JSONC_PKGNAME} --modversion`"
+        if test "$verbose_output" -eq 1; then AC_MSG_NOTICE(json-c VERSION: $JSONC_VERSION); fi
+        JSONC_CFLAGS="`${JSONC_CONFIG} ${JSONC_PKGNAME} --cflags`"
+        if test "$verbose_output" -eq 1; then AC_MSG_NOTICE(json-c CFLAGS: $JSONC_CFLAGS); fi
+        JSONC_LDADD="`${JSONC_CONFIG} ${JSONC_PKGNAME} --libs-only-l`"
+        if test "$verbose_output" -eq 1; then AC_MSG_NOTICE(json-c LDADD: $JSONC_LDADD); fi
+        JSONC_LDFLAGS="`${JSONC_CONFIG} ${JSONC_PKGNAME} --libs-only-L --libs-only-other`"
+        if test "$verbose_output" -eq 1; then AC_MSG_NOTICE(json-c LDFLAGS: $JSONC_LDFLAGS); fi
+        AC_DEFINE([HAVE_JSONC], [1], [Mark that system has JSON-C])
+    else
+        AC_MSG_NOTICE(["Can't find JSON-C package"]);
+    fi
+else
+    AC_DEFINE([HAVE_JSONC], [0], [Mark that user does not want JSON-C])
+    JSONC_VERSION=""
+    JSONC_CFLAGS=""
+    JSONC_LDADD=""
+    JSONC_LDFLAGS=""
+fi
+
+AC_SUBST(JSONC_VERSION)
+AC_SUBST(JSONC_CFLAGS)
+AC_SUBST(JSONC_LDADD)
+AC_SUBST(JSONC_LDFLAGS)
+
+if test "$wantjsonc" = "yes"; then
+    if test -z "$JSONC_CONFIG" = 0; then
+        AC_MSG_ERROR(["Can't find JSON-C package"])
+    fi
+fi
+
+dnl # END try to find JSON-C
+
 dnl Check if we want to use rapidjson or not
 AC_MSG_CHECKING([whether to use rapidjson])
 AC_ARG_WITH(
