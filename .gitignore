@@ -61,3 +61,5 @@ Makefile
 /config.h
 /configure~
 *.log
+
+proptest/proptest
