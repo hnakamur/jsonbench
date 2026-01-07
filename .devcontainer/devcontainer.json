@@ -1,0 +1,25 @@
+{
+  "name": "Ubuntu 24.04 Development Container",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true
+    }
+  },
+
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y build-essential libyajl-dev rapidjson-dev nlohmann-json3-dev librapidcheck-dev",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  },
+
+  "remoteUser": "vscode"
+}
