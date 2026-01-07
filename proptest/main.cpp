@@ -67,6 +67,25 @@ bool compareParserResults(const char* json_input) {
                  << " rj=" << rj_success
                  << " yajl=" << yajl_success
                  << " input='" << json_input << "'\n";
+
+        // Output error buffers for parsers that failed
+        if (!nl_success) {
+            const char* nl_error = nl_get_error_buffer(nl_p);
+            if (nl_error && strlen(nl_error) > 0) {
+                RC_LOG() << "  nl error: " << nl_error;
+            }
+        }
+        if (!rj_success) {
+            const char* rj_error = rj_get_error_buffer(rj_p);
+            if (rj_error && strlen(rj_error) > 0) {
+                RC_LOG() << "  rj error: " << rj_error;
+            }
+        }
+        if (!yajl_success) {
+            if (yajl_p->error_buffer && yajl_p->error_buffer_size > 0) {
+                RC_LOG() << "  yajl error: " << yajl_p->error_buffer;
+            }
+        }
     }
 
     // If all succeeded, compare output buffers
