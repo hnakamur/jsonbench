@@ -12,7 +12,6 @@ extern "C" {
 
 // Helper function to compare parser results
 bool compareParserResults(const char* json_input) {
-    std::cerr << "compareParserResults, json_input=<" << json_input << ">\n";
     char *error_msg = nullptr;
 
     // Initialize parsers
@@ -24,20 +23,17 @@ bool compareParserResults(const char* json_input) {
         if (error_msg) free(error_msg);
         return false;
     }
-    std::cerr << "compareParserResults, after nl_json_init\n";
     if (rj_json_init(&rj_p, &error_msg) != 0) {
         nl_json_cleanup(nl_p);
         if (error_msg) free(error_msg);
         return false;
     }
-    std::cerr << "compareParserResults, after rj_json_init\n";
     if (yajl_json_init(&yajl_p, &error_msg) != 1) {
         nl_json_cleanup(nl_p);
         rj_json_cleanup(rj_p);
         if (error_msg) free(error_msg);
         return false;
     }
-    std::cerr << "compareParserResults, after yajl_json_init\n";
 
     // Configure parsers to produce output (silence = 0)
     yajl_p->silence = 0;
@@ -54,24 +50,20 @@ bool compareParserResults(const char* json_input) {
 
     // Parse with all three parsers
     int nl_success = (nl_parse_buffer(nl_p, json_input, strlen(json_input), &error_msg) == 0);
-    std::cerr << "compareParserResults, nl_success=" << nl_success << "\n";
     if (error_msg) { free(error_msg); error_msg = nullptr; }
 
     int rj_success = (rj_parse_buffer(rj_p, json_input, strlen(json_input), &error_msg) == 0);
-    std::cerr << "compareParserResults, rj_success=" << rj_success << "\n";
     if (error_msg) { free(error_msg); error_msg = nullptr; }
 
     int yajl_success = (yajl_json_process_chunk(yajl_p, json_input, strlen(json_input), &error_msg) == 1);
-    std::cerr << "compareParserResults, yajl_success=" << yajl_success << "\n";
     if (error_msg) { free(error_msg); error_msg = nullptr; }
 
     // All parsers should agree on success/failure
     bool results_agree = (nl_success == yajl_success) && (rj_success == yajl_success);
-    std::cerr << "compareParserResults, results_agree#1=" << results_agree << "\n";
 
     // Debug output for failures
     if (!results_agree) {
-        std::cerr << "Parser results differ: nl=" << nl_success
+        RC_LOG() << "Parser results differ: nl=" << nl_success
                  << " rj=" << rj_success
                  << " yajl=" << yajl_success
                  << " input='" << json_input << "'\n";
@@ -87,7 +79,7 @@ bool compareParserResults(const char* json_input) {
             results_agree = (strcmp(nl_output, yajl_output) == 0) &&
                           (strcmp(rj_output, yajl_output) == 0);
             if (!results_agree) {
-                std::cerr << "Output buffers differ:\n"
+                RC_LOG() << "Output buffers differ:\n"
                          << "  nl: '" << nl_output << "'\n"
                          << "  rj: '" << rj_output << "'\n"
                          << "  yajl: '" << yajl_output << "'\n";
